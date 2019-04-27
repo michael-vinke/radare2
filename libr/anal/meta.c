@@ -214,6 +214,19 @@ R_API char *r_meta_get_var_comment (RAnal *a, int type, ut64 idx, ut64 addr) {
 	return (char *)sdb_decode (p2+1, NULL);
 }
 
+static bool mustDeleteMetaEntry(RAnal *a, ut64 addr) {
+	const char *tt = sdb_const_get (DB, sdb_fmt ("meta.t.0x%"PFMT64x, addr), NULL);
+	const char *ss = sdb_const_get (DB, sdb_fmt ("meta.s.0x%"PFMT64x, addr), NULL);
+	const char *dd = sdb_const_get (DB, sdb_fmt ("meta.d.0x%"PFMT64x, addr), NULL);
+	const char *cc = sdb_const_get (DB, sdb_fmt ("meta.C.0x%"PFMT64x, addr), NULL);
+	int count = 0;
+	if (tt) count++;
+	if (ss) count++;
+	if (dd) count++;
+	if (cc) count++;
+	return (count == 0);
+}
+
 R_API int r_meta_del(RAnal *a, int type, ut64 addr, ut64 size) {
 	char key[100], *dtr, *s, *p, *next;
 	const char *val;
@@ -261,7 +274,6 @@ R_API int r_meta_del(RAnal *a, int type, ut64 addr, ut64 size) {
 	} else {
 		snprintf (key, sizeof (key)-1, "meta.0x%"PFMT64x, addr);
 	}
-	meta_inrange_del (a, addr, size);
 	val = sdb_const_get (DB, key, 0);
 	if (val) {
 		if (type == R_META_TYPE_ANY) {
@@ -295,8 +307,12 @@ R_API int r_meta_del(RAnal *a, int type, ut64 addr, ut64 size) {
 		sdb_unset (DB, key, 0);
 	}
 	sdb_unset (DB, key, 0);
+	if (mustDeleteMetaEntry (a, addr)) {
+		meta_inrange_del (a, addr, size);
+	}
 	return false;
 }
+
 
 R_API int r_meta_var_comment_del(RAnal *a, int type, ut64 idx, ut64 addr) {
 	char *key = r_str_newf ("meta.%c.0x%"PFMT64x"0x%"PFMT64x, type, addr, idx);
